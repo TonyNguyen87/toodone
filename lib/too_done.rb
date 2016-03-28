@@ -2,28 +2,43 @@ require "too_done/version"
 require "too_done/init_db"
 require "too_done/user"
 require "too_done/session"
+require "too_done/list"
+require "too_done/task"
 
 require "thor"
 require "pry"
 
 module TooDone
+  binding.pry
   class App < Thor
-
+      # find or create the right todo list
+      # create a new item under that list, with optional date
     desc "add 'TASK'", "Add a TASK to a todo list."
     option :list, :aliases => :l, :default => "*default*",
       :desc => "The todo list which the task will be filed under."
     option :date, :aliases => :d,
       :desc => "A Due Date in YYYY-MM-DD format."
     def add(task)
-      # find or create the right todo list
-      # create a new item under that list, with optional date
+      binding.pry    
+
+      list = List.find_or_create_by(list: options[:list])
+      task = Task.find_or_create_by(task: task, due_date: options[:date], completed: false)
+      puts "#{list.list}, #{task.task}"
     end
 
     desc "edit", "Edit a task from a todo list."
     option :list, :aliases => :l, :default => "*default*",
       :desc => "The todo list whose tasks will be edited."
     def edit
-      # find the right todo list
+    #   user_id = List.find(list: options[:list])
+    #   if list == true
+    #     print tasks
+    #     puts "Which task would you like to edit?"
+    #     input = get.to_chomp
+    #     task = Task.find(list: input)
+    #     puts "Which one would you like to"
+    #   find the right todo list
+    # end
       # BAIL if it doesn't exist and have tasks
       # display the tasks and prompt for which one to edit
       # allow the user to change the title, due date
@@ -33,6 +48,10 @@ module TooDone
     option :list, :aliases => :l, :default => "*default*",
       :desc => "The todo list whose tasks will be completed."
     def done
+      list = List.find(list: options[:list])
+      
+      # print list
+      # puts "Which "
       # find the right todo list
       # BAIL if it doesn't exist and have tasks
       # display the tasks and prompt for which one(s?) to mark done
@@ -47,6 +66,21 @@ module TooDone
       :desc => "Sorting by 'history' (chronological) or 'overdue'.
       \t\t\t\t\tLimits results to those with a due date."
     def show
+   
+      list = List.find_or_create_by(list: options[:list])
+      tasks = Task.where(completed: options[:completed])
+      if options[:sort] == 'history'
+        tasks.each { |task|
+          puts "#{task.task}" }
+      elsif options[:sort] == 'overdue'
+        tasks.each { |task|
+        puts task.due_date }
+      else 
+        tasks = list.tasks.reverse_order
+        puts "#{tasks}"
+          
+        binding.pry
+      end   
       # find or create the right todo list
       # show the tasks ordered as requested, default to reverse order (recently entered first)
     end
@@ -57,6 +91,9 @@ module TooDone
     option :user, :aliases => :u,
       :desc => "The user which will be deleted (including lists and items)."
     def delete
+
+
+
       # BAIL if both list and user options are provided
       # BAIL if neither list or user option is provided
       # find the matching user or list
@@ -76,6 +113,5 @@ module TooDone
     end
   end
 end
-
 # binding.pry
 TooDone::App.start(ARGV)
