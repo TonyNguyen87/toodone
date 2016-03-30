@@ -9,7 +9,6 @@ require "thor"
 require "pry"
 
 module TooDone
-  binding.pry
   class App < Thor
       # find or create the right todo list
       # create a new item under that list, with optional date
@@ -18,27 +17,38 @@ module TooDone
       :desc => "The todo list which the task will be filed under."
     option :date, :aliases => :d,
       :desc => "A Due Date in YYYY-MM-DD format."
-    def add(task)
-      binding.pry    
+    def add(task) 
 
-      list = List.find_or_create_by(list: options[:list])
-      task = Task.find_or_create_by(task: task, due_date: options[:date], completed: false)
-      puts "#{list.list}, #{task.task}"
+      list = List.find_or_create_by(user_id: current_user.id, title: options[:list])
+      task = Task.find_or_create_by(item: task, list_id: list.id, due_date: options[:date])
+      puts "Your task, #{task.item}, was added to list: #{list.title}"
     end
 
     desc "edit", "Edit a task from a todo list."
     option :list, :aliases => :l, :default => "*default*",
       :desc => "The todo list whose tasks will be edited."
     def edit
-    #   user_id = List.find(list: options[:list])
-    #   if list == true
-    #     print tasks
-    #     puts "Which task would you like to edit?"
-    #     input = get.to_chomp
-    #     task = Task.find(list: input)
-    #     puts "Which one would you like to"
-    #   find the right todo list
-    # end
+      list = List.find_by(title: options[:list])
+      unless list
+        puts "No such list: #{options[:list]} for #{current_user.name}"
+        exit
+      end
+      tasks = Task.where(list_id: list.id).each { |task| 
+                  puts "#{task.id}. #{task.item}"}
+      unless tasks.count > 0
+          puts "No tasks on this list"
+          exit
+      end
+      puts "Please input a number for which task you would like to edit.."
+      choice = STDIN.gets.chomp.to_i
+      puts "What will the new title be?"
+      new_title = STDIN.gets.chomp
+      puts "What will the new due_date be(YYYY-MM-DD)?"
+      new_date = STDIN.gets.chomp
+      task = Task.find(choice)
+      updated = task.update_attributes(item: new_title, due_date: new_date)
+      #do i need to do updated.save here?
+      puts "You've successfully updated the task!"
       # BAIL if it doesn't exist and have tasks
       # display the tasks and prompt for which one to edit
       # allow the user to change the title, due date
@@ -48,10 +58,16 @@ module TooDone
     option :list, :aliases => :l, :default => "*default*",
       :desc => "The todo list whose tasks will be completed."
     def done
-      list = List.find(list: options[:list])
-      
-      # print list
-      # puts "Which "
+      list = current_user.lists.find_by(title: options[:list])
+      unless list && list.tasks.count > 0
+        puts "No such list or its empty"
+        exit
+      end
+      Task.where(list_id: list.id).each {|x| puts "#{x.id}: #{x.item}"}
+      puts "Please choose a task number to mark done"
+      choice = STDIN.gets.chomp.to_i
+      task = Task.find(choice)
+      complete = task.update_attributes(completed: true)
       # find the right todo list
       # BAIL if it doesn't exist and have tasks
       # display the tasks and prompt for which one(s?) to mark done
@@ -66,20 +82,15 @@ module TooDone
       :desc => "Sorting by 'history' (chronological) or 'overdue'.
       \t\t\t\t\tLimits results to those with a due date."
     def show
-   
-      list = List.find_or_create_by(list: options[:list])
-      tasks = Task.where(completed: options[:completed])
-      if options[:sort] == 'history'
-        tasks.each { |task|
-          puts "#{task.task}" }
-      elsif options[:sort] == 'overdue'
-        tasks.each { |task|
-        puts task.due_date }
+      list = List.find_or_create_by(title: options[:list])
+      tasks = Task.where(list_id: list.id)
+      binding.pry
+      if options[:sort] == "history"
+       Task.where(list_id: list.id).each {|x| puts "#{x.id}: #{x.item} Due-date: #{x.due_date}"}
+      elsif options[:sort] == "overdue"
+        Task.where(list_id: list.id).each {|x| puts "#{x.id}: #{x.item} Due-date: #{x.due_date}"}
       else 
-        tasks = list.tasks.reverse_order
-        puts "#{tasks}"
-          
-        binding.pry
+        Task.where(list_id: list.id).each {|x| puts "#{x.id}: #{x.item} Due-date: #{x.due_date}"}.reverse
       end   
       # find or create the right todo list
       # show the tasks ordered as requested, default to reverse order (recently entered first)
@@ -91,9 +102,14 @@ module TooDone
     option :user, :aliases => :u,
       :desc => "The user which will be deleted (including lists and items)."
     def delete
-
-
-
+      unless option[:list] && option[:user]
+        if user = User.find_by(name: options[:user])
+            user.destroy.all
+        else list = List.where(title: options[:list])
+            list.destory.all
+        end
+      exit
+      end
       # BAIL if both list and user options are provided
       # BAIL if neither list or user option is provided
       # find the matching user or list
